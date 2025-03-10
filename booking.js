@@ -2,73 +2,128 @@ document.addEventListener("DOMContentLoaded", function () {
     const movieSelect = document.getElementById("movie");
     const showtimeSelect = document.getElementById("showtime");
     const seatContainer = document.getElementById("seat-selection");
-    const bookingForm = document.getElementById("booking-form");
+    const confirmBookingButton = document.getElementById("confirm-booking");
 
-    // Sample data (Replace with API calls later)
-    const movies = [
-        { id: 1, title: "Inception" },
-        { id: 2, title: "Titanic" },
-        { id: 3, title: "The Dark Knight" },
-        { id: 4, title: "Interstellar" }
-    ];
-
-    const showtimes = {
-        1: ["10:00 AM", "2:00 PM", "6:00 PM"],
-        2: ["11:00 AM", "3:00 PM", "7:00 PM"],
-        3: ["12:00 PM", "4:00 PM", "8:00 PM"],
-        4: ["1:00 PM", "5:00 PM", "9:00 PM"]
-    };
-
-    const seats = 5 * 10; // Example 5 rows, 10 seats each
-
-    function populateMovies() {
-        movies.forEach(movie => {
-            const option = document.createElement("option");
-            option.value = movie.id;
-            option.textContent = movie.title;
-            movieSelect.appendChild(option);
-        });
-    }
-
-    function populateShowtimes() {
-        showtimeSelect.innerHTML = ""; // Clear previous options
-        const selectedMovie = movieSelect.value;
-
-        showtimes[selectedMovie].forEach(time => {
-            const option = document.createElement("option");
-            option.value = time;
-            option.textContent = time;
-            showtimeSelect.appendChild(option);
-        });
-    }
-
-    function generateSeats() {
-        seatContainer.innerHTML = ""; // Clear previous seats
-        for (let i = 0; i < seats; i++) {
-            const seat = document.createElement("div");
-            seat.classList.add("seat");
-            seat.textContent = i + 1;
-            seat.addEventListener("click", () => {
-                seat.classList.toggle("selected");
+    async function fetchMovies() {
+        try {
+            const response = await fetch("http://localhost:8080/api/movies");
+            const movies = await response.json();
+            movieSelect.innerHTML = "";
+            movies.forEach(movie => {
+                const option = document.createElement("option");
+                option.value = movie.movieId;
+                option.textContent = movie.title;
+                movieSelect.appendChild(option);
             });
-            seatContainer.appendChild(seat);
+            fetchShowtimes();
+        } catch (error) {
+            console.error("Error fetching movies:", error);
         }
     }
 
-    bookingForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        const selectedSeats = Array.from(document.querySelectorAll(".seat.selected")).map(seat => seat.textContent);
+    async function fetchShowtimes() {
+        const selectedMovieId = movieSelect.value;
+        try {
+            const response = await fetch(`http://localhost:8080/api/shows/movie/${selectedMovieId}`);
+            const showtimes = await response.json();
+            showtimeSelect.innerHTML = "";
+            showtimes.forEach(show => {
+                const option = document.createElement("option");
+                option.value = show.showId;
+                option.textContent = new Date(show.showTime).toLocaleString();
+                option.dataset.seats = JSON.stringify(show.seats);
+                showtimeSelect.appendChild(option);
+            });
+            fetchSeats();
+        } catch (error) {
+            console.error("Error fetching showtimes:", error);
+        }
+    }
+
+    function fetchSeats() {
+        const selectedOption = showtimeSelect.options[showtimeSelect.selectedIndex];
+        const seats = JSON.parse(selectedOption.dataset.seats || "[]");
+        seatContainer.innerHTML = "";
+
+        const screen = document.createElement("div");
+        screen.classList.add("screen");
+        screen.textContent = "SCREEN";
+        seatContainer.appendChild(screen);
+
+        let lastRow = 0;
+        let seatRow;
+
+        seats.forEach(seat => {
+            if (seat.rowIndex !== lastRow) {
+                seatRow = document.createElement("div");
+                seatRow.classList.add("seat-row");
+
+                const rowNumber = document.createElement("div");
+                rowNumber.classList.add("row-number");
+                rowNumber.textContent = seat.rowIndex;
+                seatRow.appendChild(rowNumber);
+
+                seatContainer.appendChild(seatRow);
+                lastRow = seat.rowIndex;
+            }
+
+            const seatDiv = document.createElement("div");
+            seatDiv.classList.add("seat");
+            seatDiv.textContent = seat.seatNumber;
+            seatDiv.dataset.seatId = seat.seatId; // ✅ Store the actual seat ID in a data attribute
+
+            if (seat.booked) {
+                seatDiv.classList.add("booked");
+                seatDiv.setAttribute("disabled", "true");
+            } else {
+                seatDiv.addEventListener("click", () => {
+                    seatDiv.classList.toggle("selected");
+                });
+            }
+            seatRow.appendChild(seatDiv);
+        });
+    }
+
+    confirmBookingButton.addEventListener("click", async function () {
+        const selectedSeats = Array.from(document.querySelectorAll(".seat.selected"))
+            .map(seat => parseInt(seat.dataset.seatId)); // ✅ Use seatId instead of seatNumber
 
         if (selectedSeats.length === 0) {
             alert("Please select at least one seat.");
             return;
         }
 
-        alert(`Booking confirmed for ${movieSelect.options[movieSelect.selectedIndex].text}, Showtime: ${showtimeSelect.value}, Seats: ${selectedSeats.join(", ")}`);
+        const bookingData = {
+            show: { showId: parseInt(showtimeSelect.value) },
+            customer: { customerId: 1 },
+            seats: selectedSeats.map(seatId => ({ seatId: seatId })), // ✅ Send seatId
+            totalPrice: selectedSeats.length * 10,
+            status: "CONFIRMED"
+        };
+
+        console.log("Booking Data Sent:", JSON.stringify(bookingData, null, 2));
+
+        try {
+            const response = await fetch("http://localhost:8080/api/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bookingData)
+            });
+            if (response.ok) {
+                alert("Booking successful!");
+                fetchShowtimes(); // Refresh showtimes to update booked seats
+            } else {
+                alert("Booking failed. Try again.");
+                const errorData = await response.json();
+                console.error("Booking failed:", errorData);
+            }
+        } catch (error) {
+            console.error("Error making booking:", error);
+        }
     });
 
-    movieSelect.addEventListener("change", populateShowtimes);
-    populateMovies();
-    populateShowtimes();
-    generateSeats();
+    movieSelect.addEventListener("change", fetchShowtimes);
+    showtimeSelect.addEventListener("change", fetchSeats);
+
+    fetchMovies();
 });
