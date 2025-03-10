@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KinoXP - Booking</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>KinoXP</h1>
+  <nav>
+    <span class="menu-toggle">☰</span>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="movies.html">Movies</a></li>
+      <li><a href="booking.html">Bookings</a></li>
+      <li><a href="contact.html">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <section class="booking">
+    <h2>Book Your Seats</h2>
+    <form id="booking-form">
+      <label for="movie">Select Movie:</label>
+      <select id="movie" name="movie"></select>
+
+      <label for="showtime">Select Showtime:</label>
+      <select id="showtime" name="showtime"></select>
+
+      <label for="seats">Select Seats:</label>
+      <div id="seat-selection" class="seat-container"></div>
+
+      <button type="submit" class="btn">Confirm Booking</button>
+    </form>
+  </section>
+</main>
+
+<footer>
+  <p>&copy; 2025 KinoXP. All rights reserved.</p>
+</footer>
+
+<script src="script.js"></script>
+<script src="booking.js"></script>
+</body>
+</html>
